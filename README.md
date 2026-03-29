@@ -1,6 +1,6 @@
 # Trener Tabliczki Mnożenia 🧠⚡
 
-👉 **[Zagraj teraz w przeglądarce!](TUTAJ_WKLEJ_SWOJ_LINK_Z_GITHUB_PAGES)**
+👉 **[Zagraj teraz w przeglądarce!](https://hoffis.github.io/tabliczka-mnozenia/)**
 
 Inteligentna, w pełni przeglądarkowa aplikacja do treningu tabliczki mnożenia. Aplikacja nie tylko losuje zadania, ale aktywnie **uczy się Twoich słabych punktów**, dostosowując częstotliwość trudnych równań i wizualizując postępy za pomocą map ciepła.
 
