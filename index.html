@@ -139,6 +139,7 @@ class MultiplicationEngine {
     constructor() {
         this.users = JSON.parse(localStorage.getItem('tab_users')) || ["Gracz 1"];
         this.currentUser = localStorage.getItem('tab_current_user') || this.users[0];
+        this.recent = [];
         this.loadUserData();
     }
 
@@ -160,13 +161,25 @@ class MultiplicationEngine {
 
     getNext() {
         let p = [];
-        for(let k in this.weights) for(let i=0; i<this.weights[k]; i++) p.push(k);
-        let pick;
-        let mirrorLast = this.last ? this._mirror(this.last) : null;
-        do { 
-            pick = p[Math.floor(Math.random()*p.length)]; 
-        } while(pick === this.last || pick === mirrorLast); 
-        this.last = pick;
+        
+        // Zamiast wrzucać wszystko, od razu ignorujemy te, które są w buforze
+        for(let k in this.weights) {
+            if (!this.recent.includes(k) && !this.recent.includes(this._mirror(k))) {
+                for(let i=0; i<this.weights[k]; i++) p.push(k);
+            }
+        }
+        
+        // Zabezpieczenie (awaryjne), gdyby pula była pusta
+        if(p.length === 0) p = Object.keys(this.weights);
+
+        // Losujemy z przefiltrowanej puli
+        let pick = p[Math.floor(Math.random()*p.length)]; 
+        
+        // Dodajemy wylosowane zadanie do bufora
+        this.recent.push(pick);
+        // Jeśli bufor przekroczy 5 zadań, usuwamy to najstarsze
+        if(this.recent.length > 5) this.recent.shift(); 
+
         const [a, b] = pick.split('x').map(Number);
         return { a, b, k: pick, res: a*b };
     }
