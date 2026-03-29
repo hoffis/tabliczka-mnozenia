@@ -31,7 +31,6 @@
         .btn-warn { background: var(--warn); color: white; border: none; }
         .btn-danger { background: var(--danger); color: white; border: none; }
         .btn-outline-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); font-size: 0.75rem; margin-top: 15px; }
-        .btn-abort { background: transparent; color: #777; border: 1px solid #ccc; font-size: 0.75rem; margin-top: 15px; }
         .user-section { background: #eef2f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; }
         #timer-bar { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 10px 0; overflow: hidden; }
         #timer-fill { height: 100%; background: var(--primary); width: 100%; transition: width 0.1s linear; }
@@ -94,25 +93,22 @@
 </div>
 
 <div id="screen-game" class="card hidden">
-    <div style="display:flex; justify-content: space-between; font-size: 0.9rem; font-weight:bold; align-items: center;">
-        <div id="session-time" style="color: var(--dark);">0:00</div>
-        <div id="user-display" style="color: #777; font-size: 0.8rem;">Gracz</div>
-        <div id="score-display">✅ 0 | ❌ 0</div>
+    <div style="display:flex; justify-content: space-between; font-size: 0.85rem; font-weight:bold;">
+        <div id="session-time">0:00</div>
+        <div id="user-display">Gracz</div>
+        <div id="score-display">0 pkt</div>
     </div>
     <div id="timer-bar"><div id="timer-fill"></div></div>
     <div id="question">? x ?</div>
     <input type="number" id="answer" inputmode="numeric" autofocus autocomplete="off">
     <div id="feedback" style="height:25px; margin-top:10px; font-weight:bold; font-size:1.1rem;"></div>
-    
-    <button class="btn-abort" onclick="abortSession()">Zakończ i odrzuć wyniki</button>
 </div>
 
 <div id="screen-pause" class="card hidden">
     <h2 style="color: var(--warn);">Wykryto bezczynność!</h2>
     <p>Opuściłeś 3 zadania z rzędu bez wpisywania odpowiedzi.</p>
     <button class="btn-start" onclick="resumeSession()">WZNÓW SESJĘ</button>
-    <button class="btn-danger" onclick="forceEndSession()">ZAKOŃCZ (zapisz wynik)</button>
-    <button class="btn-abort" onclick="abortSession()">ODRZUĆ SESJĘ</button>
+    <button class="btn-danger" onclick="forceEndSession()">ZAKOŃCZ TERAZ</button>
 </div>
 
 <div id="screen-summary" class="card hidden">
@@ -143,7 +139,7 @@ class MultiplicationEngine {
     constructor() {
         this.users = JSON.parse(localStorage.getItem('tab_users')) || ["Gracz 1"];
         this.currentUser = localStorage.getItem('tab_current_user') || this.users[0];
-        this.recent = []; // Bufor anty-powtórzeniowy
+        this.recent = [];
         this.loadUserData();
     }
 
@@ -165,17 +161,23 @@ class MultiplicationEngine {
 
     getNext() {
         let p = [];
+        
+        // Zamiast wrzucać wszystko, od razu ignorujemy te, które są w buforze
         for(let k in this.weights) {
             if (!this.recent.includes(k) && !this.recent.includes(this._mirror(k))) {
                 for(let i=0; i<this.weights[k]; i++) p.push(k);
             }
         }
         
-        if(p.length === 0) p = Object.keys(this.weights); // Zabezpieczenie
+        // Zabezpieczenie (awaryjne), gdyby pula była pusta
+        if(p.length === 0) p = Object.keys(this.weights);
 
+        // Losujemy z przefiltrowanej puli
         let pick = p[Math.floor(Math.random()*p.length)]; 
         
+        // Dodajemy wylosowane zadanie do bufora
         this.recent.push(pick);
+        // Jeśli bufor przekroczy 5 zadań, usuwamy to najstarsze
         if(this.recent.length > 5) this.recent.shift(); 
 
         const [a, b] = pick.split('x').map(Number);
@@ -203,7 +205,7 @@ class MultiplicationEngine {
                 this.stats[m].e++;
             }
         }
-        // USUNIĘTO: this.save() - Zapisujemy do LocalStorage dopiero na koniec sesji!
+        this.save();
     }
 
     resetCurrentProfile() {
@@ -224,7 +226,7 @@ class MultiplicationEngine {
             corr: corrStr
         });
         if(this.history.length > 20) this.history.pop();
-        this.save(); // Zapis zaktualizowanej historii ORAZ wag z pamięci tymczasowej
+        this.save();
     }
 
     save() {
@@ -276,16 +278,11 @@ function startGame() {
         dur: document.getElementById('dur').value,
         corr: document.getElementById('corr').value
     }));
-    changeUser(); // To ładuje świeży stan profilu
-    engine.recent = []; // Reset bufora powtórzeń na start sesji
-    
+    changeUser();
     document.getElementById('screen-start').classList.add('hidden');
     document.getElementById('screen-game').classList.remove('hidden');
     document.getElementById('user-display').textContent = engine.currentUser;
-    
     sessionScore = 0; correct = 0; wrong = 0; consecutiveTimeouts = 0;
-    document.getElementById('score-display').innerHTML = `✅ 0 | ❌ 0`;
-    
     timeLeftSession = document.getElementById('dur').value * 60;
     startSessionTimer();
     newQ();
@@ -321,10 +318,12 @@ function handleAns(ok, isTimeout = false) {
     if (isTimeout) consecutiveTimeouts++;
     else consecutiveTimeouts = 0;
     
+    // Zablokuj pole, aby zignorować "rozpędzone" klawisze
+    document.getElementById('answer').disabled = true;
+    
     engine.update(curQ.k, ok, Date.now()-qStart);
     if(ok) { correct++; sessionScore++; } else { wrong++; }
     
-    // AKTUALIZACJA STATYSTYK NA ŻYWO W EKRANIE GRY
     document.getElementById('score-display').innerHTML = `✅ ${correct} | ❌ ${wrong}`;
     
     document.getElementById('feedback').textContent = ok ? "BRAWO!" : `BŁĄD! (${curQ.res})`;
@@ -334,9 +333,14 @@ function handleAns(ok, isTimeout = false) {
         clearInterval(sTimer);
         document.getElementById('screen-game').classList.add('hidden');
         document.getElementById('screen-pause').classList.remove('hidden');
+        document.getElementById('answer').disabled = false; // Odblokuj w razie pauzy
         return; 
     }
-    setTimeout(() => { document.getElementById('feedback').textContent = ""; newQ(); }, 800);
+    setTimeout(() => { 
+        document.getElementById('feedback').textContent = ""; 
+        document.getElementById('answer').disabled = false; // Odblokuj dla nowego zadania
+        newQ(); 
+    }, 800);
 }
 
 function resumeSession() {
@@ -347,27 +351,9 @@ function resumeSession() {
     newQ();
 }
 
-// Odrzucenie sesji (uruchamiane przyciskiem)
-function abortSession() {
-    if(confirm("Czy na pewno chcesz przerwać? Postępy z tej sesji nie zostaną zapisane.")) {
-        clearInterval(sTimer);
-        clearInterval(qTimer);
-        
-        // Ponowne wczytanie danych z localStorage niszczy zmiany z aktualnej sesji (będące w pamięci RAM)
-        engine.loadUserData(); 
-        
-        document.getElementById('screen-game').classList.add('hidden');
-        document.getElementById('screen-pause').classList.add('hidden');
-        document.getElementById('screen-start').classList.remove('hidden');
-        
-        document.getElementById('answer').value = '';
-        document.getElementById('feedback').textContent = '';
-    }
-}
-
 function forceEndSession() {
     document.getElementById('screen-pause').classList.add('hidden');
-    endSession(); // To nadpisuje dane w localStorage, bo gra została formalnie zakończona
+    endSession();
 }
 
 function endSession() {
@@ -436,7 +422,16 @@ const answerInput = document.getElementById('answer');
 
 answerInput.addEventListener('input', (e) => { 
     consecutiveTimeouts = 0; 
-    if(parseInt(e.target.value) === curQ.res) handleAns(true); 
+    const val = e.target.value;
+    const expected = curQ.res.toString();
+    const modeCorr = document.getElementById('corr').value;
+
+    if(parseInt(val) === curQ.res) {
+        handleAns(true); 
+    } else if (modeCorr === 'false' && val.length === expected.length) {
+        // Jeśli tryb to "Bez poprawek", wpisano już wymaganą liczbę znaków i wynik nie jest poprawny
+        handleAns(false);
+    }
 });
 
 answerInput.addEventListener('keypress', (e) => {
