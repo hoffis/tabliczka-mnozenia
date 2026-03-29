@@ -1,1 +1,424 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Trener Tabliczki Mnożenia</title>
+    <meta name="description" content="Inteligentna aplikacja do treningu tabliczki mnożenia. Uczy się Twoich błędów, generuje mapy ciepła i dostosowuje poziom trudności.">
+    <meta name="theme-color" content="#4CAF50">
 
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hoffis.github.io/tabliczka-mnozenia/">
+    <meta property="og:title" content="Trener Tabliczki Mnożenia 🧠⚡">
+    <meta property="og:description" content="Zagraj i sprawdź swój refleks! Aplikacja analizuje czasy odpowiedzi i błędy, pomagając opanować tabliczkę mnożenia do perfekcji.">
+    <meta property="og:image" content="https://hoffis.github.io/tabliczka-mnozenia/og-image.jpg">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://hoffis.github.io/tabliczka-mnozenia/">
+    <meta name="twitter:title" content="Trener Tabliczki Mnożenia 🧠⚡">
+    <meta name="twitter:description" content="Zagraj i sprawdź swój refleks! Aplikacja analizuje czasy odpowiedzi i błędy, pomagając opanować tabliczkę mnożenia do perfekcji.">
+    <meta name="twitter:image" content="https://hoffis.github.io/tabliczka-mnozenia/og-image.jpg">
+
+    <style>
+        :root { --primary: #4CAF50; --danger: #ff5252; --dark: #2c3e50; --bg: #f0f2f5; --warn: #ff9800; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: var(--bg); margin: 0; padding-top: 10px; }
+        .card { width: 90%; max-width: 380px; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; margin-bottom: 10px; }
+        .hidden { display: none !important; }
+        select, button, input { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; font-weight: bold; box-sizing: border-box; cursor: pointer; }
+        .btn-start { background: var(--primary); color: white; border: none; padding: 14px; font-size: 1.1rem; }
+        .btn-stats { background: var(--dark); color: white; border: none; }
+        .btn-warn { background: var(--warn); color: white; border: none; }
+        .btn-danger { background: var(--danger); color: white; border: none; }
+        .btn-outline-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); font-size: 0.75rem; margin-top: 15px; }
+        .user-section { background: #eef2f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; }
+        #timer-bar { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 10px 0; overflow: hidden; }
+        #timer-fill { height: 100%; background: var(--primary); width: 100%; transition: width 0.1s linear; }
+        #question { font-size: 3.2rem; margin: 10px 0; color: var(--dark); }
+        #answer { font-size: 2.2rem; text-align: center; border: 2px solid var(--primary); cursor: text; }
+        .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 1px; font-size: 0.65rem; margin-top: 5px; margin-bottom: 15px; }
+        .heatmap-table td { width: 11%; height: 22px; text-align: center; border-radius: 2px; }
+        .cell-label { background: #f0f0f0; font-weight: bold; }
+        h3 { font-size: 0.95rem; margin: 15px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .history-list { max-height: 180px; overflow-y: auto; text-align: left; font-size: 0.75rem; border: 1px solid #eee; padding: 5px; border-radius: 5px; }
+        .history-item { padding: 6px; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; }
+        .history-item:last-child { border-bottom: none; }
+        .history-row { display: flex; justify-content: space-between; }
+        .history-meta { color: #777; font-size: 0.65rem; margin-top: 2px; }
+        .clickable-tile { background: #e8f5e9; border: 1px solid var(--primary); padding: 12px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+        .clickable-tile:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+<div id="screen-start" class="card">
+    <h2>Tabliczka Mnożenia</h2>
+    
+    <div class="user-section">
+        <label style="font-size: 0.8rem;">Wybierz profil:</label>
+        <select id="user-select" onchange="changeUser()"></select>
+        <input type="text" id="new-user-name" placeholder="Nowe imię...">
+        <button onclick="addUser()" style="background:#ddd; font-size: 0.7rem;">+ Dodaj profil</button>
+    </div>
+
+    <div style="display: flex; gap: 5px;">
+        <div style="width: 50%;">
+            <label style="font-size:0.75rem">Trudność:</label>
+            <select id="diff">
+                <option value="10">Łatwy (10s)</option>
+                <option value="5">Trudny (5s)</option>
+                <option value="3">Expert (3s)</option>
+            </select>
+        </div>
+        <div style="width: 50%;">
+            <label style="font-size:0.75rem">Sesja:</label>
+            <select id="dur">
+                <option value="2">2 minuty</option>
+                <option value="4">4 minuty</option>
+                <option value="10">10 minut</option>
+            </select>
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <label style="font-size:0.75rem">Tryb wprowadzania:</label>
+        <select id="corr">
+            <option value="true">Z poprawkami</option>
+            <option value="false">Bez poprawek (blokada Backspace)</option>
+        </select>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">START SESJI</button>
+    <button class="btn-stats" onclick="showStatsOnly()">STATYSTYKI I HISTORIA</button>
+</div>
+
+<div id="screen-game" class="card hidden">
+    <div style="display:flex; justify-content: space-between; font-size: 0.85rem; font-weight:bold;">
+        <div id="session-time">0:00</div>
+        <div id="user-display">Gracz</div>
+        <div id="score-display">0 pkt</div>
+    </div>
+    <div id="timer-bar"><div id="timer-fill"></div></div>
+    <div id="question">? x ?</div>
+    <input type="number" id="answer" inputmode="numeric" autofocus autocomplete="off">
+    <div id="feedback" style="height:25px; margin-top:10px; font-weight:bold; font-size:1.1rem;"></div>
+</div>
+
+<div id="screen-pause" class="card hidden">
+    <h2 style="color: var(--warn);">Wykryto bezczynność!</h2>
+    <p>Opuściłeś 3 zadania z rzędu bez wpisywania odpowiedzi.</p>
+    <button class="btn-start" onclick="resumeSession()">WZNÓW SESJĘ</button>
+    <button class="btn-danger" onclick="forceEndSession()">ZAKOŃCZ TERAZ</button>
+</div>
+
+<div id="screen-summary" class="card hidden">
+    <h2 id="summary-title" style="margin-top: 0;">Statystyki Profilu</h2>
+    
+    <div id="session-current-stats" class="clickable-tile" onclick="toggleHeatmaps()">
+        <p id="summary-stats" style="font-size: 1.1rem; margin: 0; font-weight: bold;"></p>
+        <div style="font-size: 0.7rem; color: var(--primary); margin-top: 5px;">👇 Kliknij, aby pokazać/ukryć mapy ciepła</div>
+    </div>
+    
+    <div id="heatmaps-container" class="hidden">
+        <h3>⚡ Czas odpowiedzi (sekundy)</h3>
+        <table id="hm-time" class="heatmap-table"></table>
+
+        <h3>❌ Mapa błędów (ilość)</h3>
+        <table id="hm-errors" class="heatmap-table"></table>
+    </div>
+
+    <h3>Dziennik sesji</h3>
+    <div id="history-container" class="history-list"></div>
+
+    <button class="btn-outline-danger" onclick="clearProfileData()">⚠ WYCZYŚĆ DANE PROFILU</button>
+    <button class="btn-stats" style="margin-top: 10px;" onclick="location.reload()">POWRÓT DO MENU</button>
+</div>
+
+<script>
+class MultiplicationEngine {
+    constructor() {
+        this.users = JSON.parse(localStorage.getItem('tab_users')) || ["Gracz 1"];
+        this.currentUser = localStorage.getItem('tab_current_user') || this.users[0];
+        this.loadUserData();
+    }
+
+    loadUserData() {
+        const data = JSON.parse(localStorage.getItem(`tab_data_${this.currentUser}`)) || { weights: {}, stats: {}, history: [] };
+        this.weights = data.weights || {};
+        this.stats = data.stats || {};
+        this.history = data.history || [];
+        this.initKeys();
+    }
+
+    initKeys() {
+        for(let i=2; i<=9; i++) for(let j=2; j<=9; j++) {
+            let k = i+'x'+j;
+            if(!this.weights[k]) this.weights[k] = 5;
+            if(!this.stats[k]) this.stats[k] = { t: [], e: 0 };
+        }
+    }
+
+    getNext() {
+        let p = [];
+        for(let k in this.weights) for(let i=0; i<this.weights[k]; i++) p.push(k);
+        let pick;
+        let mirrorLast = this.last ? this._mirror(this.last) : null;
+        do { 
+            pick = p[Math.floor(Math.random()*p.length)]; 
+        } while(pick === this.last || pick === mirrorLast); 
+        this.last = pick;
+        const [a, b] = pick.split('x').map(Number);
+        return { a, b, k: pick, res: a*b };
+    }
+
+    _mirror(k) { const [a,b]=k.split('x'); return b+'x'+a; }
+
+    update(k, ok, ms) {
+        const m = this._mirror(k);
+        const isSame = (k === m); 
+        if(ok) {
+            this.weights[k] = Math.max(1, this.weights[k]-1);
+            this.stats[k].t.push(ms/1000);
+            if(this.stats[k].t.length > 10) this.stats[k].t.shift(); 
+            if(!isSame) {
+                this.weights[m] = Math.max(1, this.weights[m]-1);
+                this.stats[m].t = [...this.stats[k].t];
+            }
+        } else {
+            this.weights[k] = Math.min(20, this.weights[k]+6);
+            this.stats[k].e++;
+            if(!isSame) {
+                this.weights[m] = Math.min(20, this.weights[m]+3);
+                this.stats[m].e++;
+            }
+        }
+        this.save();
+    }
+
+    resetCurrentProfile() {
+        this.weights = {};
+        this.stats = {};
+        this.history = [];
+        this.initKeys();
+        this.save();
+    }
+
+    addSessionToHistory(correct, wrong, durationStr, diffStr, corrStr) {
+        this.history.unshift({
+            date: new Date().toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+            c: correct,
+            w: wrong,
+            dur: durationStr,
+            diff: diffStr,
+            corr: corrStr
+        });
+        if(this.history.length > 20) this.history.pop();
+        this.save();
+    }
+
+    save() {
+        localStorage.setItem(`tab_data_${this.currentUser}`, JSON.stringify({ weights: this.weights, stats: this.stats, history: this.history }));
+        localStorage.setItem('tab_users', JSON.stringify(this.users));
+        localStorage.setItem('tab_current_user', this.currentUser);
+    }
+}
+
+const engine = new MultiplicationEngine();
+let sessionScore = 0, correct = 0, wrong = 0, qTimer, sTimer, curQ, qStart, timeLeftSession = 0, consecutiveTimeouts = 0;
+
+function updateUI() {
+    const sel = document.getElementById('user-select');
+    sel.innerHTML = engine.users.map(u => `<option value="${u}" ${u===engine.currentUser?'selected':''}>${u}</option>`).join('');
+    const saved = JSON.parse(localStorage.getItem('tab_settings')) || { diff: "5", dur: "2", corr: "true" };
+    document.getElementById('diff').value = saved.diff;
+    document.getElementById('dur').value = saved.dur;
+    if(saved.corr) document.getElementById('corr').value = saved.corr;
+}
+
+function changeUser() {
+    engine.currentUser = document.getElementById('user-select').value;
+    engine.loadUserData();
+    engine.save();
+}
+
+function addUser() {
+    const name = document.getElementById('new-user-name').value.trim();
+    if(name && !engine.users.includes(name)) {
+        engine.users.push(name);
+        engine.currentUser = name;
+        engine.resetCurrentProfile();
+        location.reload();
+    }
+}
+
+function clearProfileData() {
+    if(confirm(`Czy na pewno chcesz WYCZYŚCIĆ wszystkie statystyki i historię dla: ${engine.currentUser}?`)) {
+        engine.resetCurrentProfile();
+        renderMapsAndHistory();
+        document.getElementById('summary-stats').innerHTML = "Dane zostały zresetowane.";
+    }
+}
+
+function startGame() {
+    localStorage.setItem('tab_settings', JSON.stringify({ 
+        diff: document.getElementById('diff').value, 
+        dur: document.getElementById('dur').value,
+        corr: document.getElementById('corr').value
+    }));
+    changeUser();
+    document.getElementById('screen-start').classList.add('hidden');
+    document.getElementById('screen-game').classList.remove('hidden');
+    document.getElementById('user-display').textContent = engine.currentUser;
+    sessionScore = 0; correct = 0; wrong = 0; consecutiveTimeouts = 0;
+    timeLeftSession = document.getElementById('dur').value * 60;
+    startSessionTimer();
+    newQ();
+}
+
+function startSessionTimer() {
+    clearInterval(sTimer);
+    sTimer = setInterval(() => {
+        timeLeftSession--;
+        document.getElementById('session-time').textContent = Math.floor(timeLeftSession/60) + ":" + String(timeLeftSession%60).padStart(2,'0');
+        if(timeLeftSession <= 0) endSession();
+    }, 1000);
+}
+
+function newQ() {
+    curQ = engine.getNext();
+    document.getElementById('question').textContent = `${curQ.a} × ${curQ.b}`;
+    document.getElementById('answer').value = '';
+    document.getElementById('answer').focus();
+    qStart = Date.now();
+    let limit = document.getElementById('diff').value;
+    let rem = limit;
+    clearInterval(qTimer);
+    qTimer = setInterval(() => {
+        rem -= 0.1;
+        document.getElementById('timer-fill').style.width = (rem/limit)*100 + "%";
+        if(rem <= 0) handleAns(false, true);
+    }, 100);
+}
+
+function handleAns(ok, isTimeout = false) {
+    clearInterval(qTimer);
+    if (isTimeout) consecutiveTimeouts++;
+    else consecutiveTimeouts = 0;
+    
+    engine.update(curQ.k, ok, Date.now()-qStart);
+    if(ok) { correct++; sessionScore++; } else { wrong++; }
+    
+    document.getElementById('score-display').textContent = sessionScore + " pkt";
+    document.getElementById('feedback').textContent = ok ? "BRAWO!" : `BŁĄD! (${curQ.res})`;
+    document.getElementById('feedback').style.color = ok ? "var(--primary)" : "var(--danger)";
+    
+    if (consecutiveTimeouts >= 3) {
+        clearInterval(sTimer);
+        document.getElementById('screen-game').classList.add('hidden');
+        document.getElementById('screen-pause').classList.remove('hidden');
+        return; 
+    }
+    setTimeout(() => { document.getElementById('feedback').textContent = ""; newQ(); }, 800);
+}
+
+function resumeSession() {
+    consecutiveTimeouts = 0;
+    document.getElementById('screen-pause').classList.add('hidden');
+    document.getElementById('screen-game').classList.remove('hidden');
+    startSessionTimer();
+    newQ();
+}
+
+function forceEndSession() {
+    document.getElementById('screen-pause').classList.add('hidden');
+    endSession();
+}
+
+function endSession() {
+    clearInterval(sTimer); clearInterval(qTimer);
+    const durStr = document.getElementById('dur').value + "m";
+    const diffStr = document.getElementById('diff').value + "s";
+    const corrStr = document.getElementById('corr').value === 'true' ? "Z popr." : "Bez popr.";
+    
+    engine.addSessionToHistory(correct, wrong, durStr, diffStr, corrStr);
+    
+    document.getElementById('screen-game').classList.add('hidden');
+    document.getElementById('screen-summary').classList.remove('hidden');
+    document.getElementById('summary-title').textContent = `Koniec sesji: ${engine.currentUser}`;
+    
+    document.getElementById('summary-stats').innerHTML = `✅ ${correct} | ❌ ${wrong}`;
+    
+    document.getElementById('heatmaps-container').classList.add('hidden'); 
+    renderMapsAndHistory();
+}
+
+function showStatsOnly() {
+    changeUser();
+    document.getElementById('screen-start').classList.add('hidden');
+    document.getElementById('screen-summary').classList.remove('hidden');
+    document.getElementById('summary-title').textContent = `Statystyki: ${engine.currentUser}`;
+    document.getElementById('summary-stats').innerHTML = `Ogólny przegląd profilu`;
+    document.getElementById('heatmaps-container').classList.add('hidden');
+    renderMapsAndHistory();
+}
+
+function toggleHeatmaps() {
+    const container = document.getElementById('heatmaps-container');
+    container.classList.toggle('hidden');
+}
+
+function renderMapsAndHistory() {
+    const hist = document.getElementById('history-container');
+    hist.innerHTML = engine.history.length ? engine.history.map(h => 
+        `<div class="history-item">
+            <div class="history-row"><span>📅 ${h.date}</span><span>✅ <b>${h.c}</b> | ❌ <b>${h.w}</b></span></div>
+            <div class="history-meta">Trudność: ${h.diff} | Czas: ${h.dur} | Tryb: ${h.corr}</div>
+        </div>`).join('') : "Brak zapisanych sesji.";
+
+    ['hm-time', 'hm-errors'].forEach(id => {
+        let html = '<tr><td></td>' + [2,3,4,5,6,7,8,9].map(n => `<td class="cell-label">${n}</td>`).join('') + '</tr>';
+        for(let i=2; i<=9; i++) {
+            html += `<tr><td class="cell-label">${i}</td>`;
+            for(let j=2; j<=9; j++) {
+                const data = engine.stats[i+'x'+j];
+                let color = '#fff';
+                if(id === 'hm-time') {
+                    const avg = data.t.length ? data.t.reduce((a,b)=>a+b)/data.t.length : null;
+                    color = avg ? (avg < 2 ? '#c8e6c9' : (avg < 4 ? '#fff9c4' : '#ffccbc')) : '#eee';
+                } else {
+                    color = data.e === 0 ? '#fff' : (data.e < 4 ? '#ffe0b2' : '#ff5252');
+                }
+                html += `<td style="background:${color}">${i*j}</td>`;
+            }
+            html += '</tr>';
+        }
+        document.getElementById(id).innerHTML = html;
+    });
+}
+
+const answerInput = document.getElementById('answer');
+
+answerInput.addEventListener('input', (e) => { 
+    consecutiveTimeouts = 0; 
+    if(parseInt(e.target.value) === curQ.res) handleAns(true); 
+});
+
+answerInput.addEventListener('keypress', (e) => {
+    if(e.key === 'Enter' && e.target.value !== '') {
+        consecutiveTimeouts = 0;
+        if(parseInt(e.target.value) !== curQ.res) handleAns(false);
+    }
+});
+
+answerInput.addEventListener('keydown', (e) => {
+    if (document.getElementById('corr').value === 'false') {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            e.preventDefault();
+        }
+    }
+});
+
+updateUI();
+</script>
+</body>
+</html>
